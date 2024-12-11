@@ -1,0 +1,5 @@
+Name=Run Node.js App
+Exec=/home/eurosofttech/camera_server/new_work/run_dev.sh
+Terminal=true
+Type=Application
+Icon=utilities-terminal
