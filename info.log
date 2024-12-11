@@ -1134,3 +1134,8 @@
 {"level":"info","message":"Connection from ::ffff:185.99.27.233:60923 closed","timestamp":"2024-12-11T10:28:20.604Z"}
 {"level":"info","message":"Connection from ::ffff:185.99.27.233:60932 closed","timestamp":"2024-12-11T10:28:20.657Z"}
 {"level":"info","message":"Connection from ::ffff:185.99.27.233:60932 closed","timestamp":"2024-12-11T10:28:20.658Z"}
+{"level":"info","message":"Camera Transfer Server (Copyright © 2022, \u001b[34mTeltonika\u001b[0m), version 0.2.13","timestamp":"2024-12-11T12:11:44.665Z"}
+{"level":"info","message":"Chosen auto camera type detection","timestamp":"2024-12-11T12:11:44.669Z"}
+{"level":"info","message":"Metadata will be requested at the start of the file transfer","timestamp":"2024-12-11T12:11:44.670Z"}
+{"level":"info","message":"Starting REGULAR mode","timestamp":"2024-12-11T12:11:44.673Z"}
+{"level":"info","message":"Listening to 7056 port","timestamp":"2024-12-11T12:11:44.676Z"}

@@ -1,10 +1,7 @@
-//const AWS = require("aws-sdk");
+
 const { ObjectId } = require("mongodb");
-// const s3 = new AWS.S3({
-//   accessKeyId: "AKIAYYM3CIEBEKPUNDEU",
-//   secretAccessKey: "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",
-//   region: "eu-west-2",
-// });
+require("dotenv").config();
+
 const fs = require('fs');
 var MongoClient = require("mongodb").MongoClient;
 const url =
@@ -259,13 +256,12 @@ const url =
 // }
 const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
 
-
 // Initialize S3 client
 const s3Client = new S3Client({
-  region: "eu-west-2",
+  region: process.env.AWSREGION,
   credentials: {
-    accessKeyId: "AKIAYYM3CIEBEKPUNDEU",
-    secretAccessKey: "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",
+    accessKeyId: process.env.ACCESSKEY,
+    secretAccessKey: process.env.SECRETACCESS,
   },
 });
 
