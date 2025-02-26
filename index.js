@@ -2,15 +2,14 @@ const net = require('net');
 const commandLineArgs = require('command-line-args');
 const tls = require('tls');
 const fs = require('fs');
-const protocol = require('./protocol.js');
+const protocol = require('./protocolori.js');
 const cliProgress = require('cli-progress');
 const _colors = require('colors');
 const dbg = require('./debug.js')
 const { v4: uuidv4 } = require("uuid");
-const { timeStamp } = require('console');
 const path = require('path')
-const { processVideoFile, processImageFile } = require("./setparamsofS3.js");
-// "dev": "node indexori.js -p 7056 -r 0 -m 1"
+const { processVideoFile, processImageFile } = require("./utils/setparamsofS3.js");
+
 process.setMaxListeners(0);
 dbg.logAndPrint("Camera Transfer Server (Copyright © 2022, \x1b[34mTeltonika\x1b[0m), version 0.2.13");
 const optionDefinitions = [
@@ -136,30 +135,18 @@ function handleConnection(connection) {
     let metadata = new protocol.MetaDataDescriptor();
     dbg.logAndPrint('Client connected: ' + remoteAddress);
 
+    let lastActivityTime = Date.now(); 
+  dbg.logAndPrint("Client connected: " + remoteAddress);
+  const INACTIVITY_TIMEOUT = 30000; 
 
-    let timeout;
-    const TIMEOUT_INTERVAL = 200 * 1000; // 100 seconds
-
-    function resetTimeout() {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => {
-            dbg.logAndPrint(`Connection timeout for ${remoteAddress}. Closing connection.`);
-            connection.end(); // Close the connection
-        }, TIMEOUT_INTERVAL);
+  // Timer to check inactivity
+  const inactivityTimer = setInterval(() => {
+    if (Date.now() - lastActivityTime > INACTIVITY_TIMEOUT) {
+      console.log("aaaa")
+      connection.destroy(); // Close the connection
+      clearInterval(inactivityTimer); // Clear the interval timer
     }
-
-    // Start timeout on connection
-    resetTimeout();
-
-    connection.on('data', (data) => {
-        resetTimeout(); // Reset timeout whenever data is received
-        onConnData(data);
-    });
-
-    connection.once('close', () => {
-        clearTimeout(timeout); // Clear timeout on connection close
-        onConnClose();
-    });
+  }, 1000); // Check every second
 
     connection.on('data', onConnData);
     connection.once('close', onConnClose);
@@ -179,8 +166,11 @@ function handleConnection(connection) {
     }
 
     function onConnData(data) {
+        //connection.end();
         dbg.log("state" + current_state);
         dbg.log("[packets]: [" + data.toString('hex') + "]");
+        lastActivityTime = Date.now();
+
         // Check if there is a TCP buffer overflow
         if (data.length >= buffer_size) {
             dbg.error("Too much data: " + data.length + " >= " + buffer_size);
@@ -224,6 +214,7 @@ function handleConnection(connection) {
                // Check for duplicate sessions
                 if (activeSessions.has(imei)) {
                     tcp_buffer = Buffer.alloc(0);
+                    console.log("c",connection.id)
                     dbg.logAndPrint(`Duplicate session detected for IMEI: ${imei}. Terminating connection.`);
                    connection.end();
                     // const query = Buffer.from([0, 0, 0, 0]);
@@ -236,7 +227,7 @@ function handleConnection(connection) {
                     connectionId: connection.id,
                     startTime: Date.now(),
                 });
-
+                console.log("n",connection.id)
                 dbg.logAndPrint(`Session started for IMEI: ${imei}`);
             }
         
@@ -296,6 +287,7 @@ function handleConnection(connection) {
 
     function onConnClose() {
        console.log("close")
+       clearInterval(inactivityTimer);
        tcp_buffer = Buffer.alloc(0);
         dbg.logAndPrint('Connection from ' + remoteAddress + ' closed');
         activeSessions.forEach((session, imei) => {
@@ -307,7 +299,7 @@ function handleConnection(connection) {
                 if(fs.existsSync(filePath2)){
                     console.log("close if")
                     const jsondata = JSON.parse(fs.readFileSync(filePath2, 'utf8'));
-                    if((jsondata?.uploadedToS3 === false || jsondata?.uploadedToS3 == null  || jsondata?.uploadedToS3 == undefined)&& fs.existsSync(filePath3)){
+                    if((jsondata?.uploadedToS3 === false || jsondata?.uploadedToS3 == null  || jsondata?.uploadedToS3 == undefined)&& (fs.existsSync(filePath3)) && (jsondata?.receivedPackages > 5)){
                         
                         if (device_info.getExtension() == ".h265") {
                             processVideoFile(device_info.getDeviceDirectory(), metadata.getTimestamp(),metadata.getFramerate(),device_info.getExtension(),device_info.getFileToDL() ,device_info)

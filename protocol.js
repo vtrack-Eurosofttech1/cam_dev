@@ -1,15 +1,17 @@
 const fs = require('fs');
 const process = require('process');
 const { exec } = require("child_process");
-const cliProgress = require('cli-progress');
-const _colors = require('colors');
 const dbg = require('./debug.js');
-const { Console } = require('console');
-const DeviceModel = require("./model/device.model.js");
-const emitdatatoSocket = require("./socket.js");
-const { processVideoFile, processImageFile } = require("./setparamsofS3.js");
-const path = require('path')
-
+const DeviceModel = require("./model/device.model");
+const emitdatatoSocket = require("./utils/socket.js");
+const { processVideoFile, processImageFile } = require("./utils/setparamsofS3.js");
+const path = require('path');
+/* const redisConnectionHelper = require('./redisConnectionHelper.js');
+var redisClient
+const rediswork = async()=>{
+    redisClient = await redisConnectionHelper()
+}
+ */
 /* Constants */
 const FSM_STATE = {
     WAIT_FOR_CMD: 0,
@@ -262,6 +264,8 @@ Device.prototype.getProtocolVersion = function () {
     return this.protocol_version;
 }
 
+
+
 Device.prototype.getDeviceInfoData = function () {
     let extension ;
     if(this.extension_to_use==".h265"){
@@ -275,10 +279,10 @@ Device.prototype.getDeviceInfoData = function () {
       filetype: this.extension_to_use,
       // fsm_state: this.fsm_state,,
       camera_type: this.query_file,
-      timestamp:this.timestamp ,
+      timestamp:this.newtimestamp ,
       deviceDirectory: this.deviceDirectory,
-   //   filename: this.filename,
-      path:`https://vtracksolutions.s3.eu-west-2.amazonaws.com/media/${this.deviceDirectory.split("/")[1]}/${this.timestamp}${extension}`,    
+      filename: this.filename,
+      path:`https://vtracksolutions.s3.eu-west-2.amazonaws.com/media/${this.deviceDirectory.split("/")[1]}/${this.newtimestamp}${extension}`,    
       // actual_crc: this.actual_crc,
       received_packages: this.received_packages,
       total_packages: this.total_packages,
@@ -833,7 +837,44 @@ function ConvertVideoFile(directory, filename, extension, metadata, metadata_opt
             return;
         }
     });
-}
+}const getBufferFromRedis = async (filePathMedia) => {
+    try {
+      // Get the stored JSON string from Redis
+      const storedData = await redisClient.get(filePathMedia);
+  
+      if (storedData) {
+        // Parse the stored data back into a buffer
+        const parsedBuffer = JSON.parse(storedData);
+        return parsedBuffer;
+      } else {
+        throw new Error('No data found for the given path');
+      }
+    } catch (error) {
+      console.error('Error retrieving the buffer:', error);
+      throw error;
+    }
+  };
+  
+
+const storeAndRetrieveBuffer = async (raw_file, filePathMedia) => {
+    try {
+      // Convert raw file to buffer
+      let buffer = Buffer.from(raw_file, "base64");
+  
+  await redisClient.append(filePathMedia, buffer);
+     // await redisClient.set(filePathMedia, JSON.stringify(buffer));
+  
+      // Retrieve the buffer from Redis, parse it, and return
+    //   const storedData = await redisClient.get(filePathMedia);
+    //   const parsedBuffer = JSON.parse(storedData);
+  
+      return true;
+    } catch (error) {
+      console.error('Error processing the file:', error);
+      throw error; // Propagate the error
+    }
+  };
+  
 
 
 function initializeData(imei, timestamp, totalPackages, framerate, filetype, length,clientId, vehicle, filepath) {
@@ -908,7 +949,7 @@ exports.run_fsm = function (current_state, connection, cmd_id, data_buffer, devi
            // console.log("filePath2: ",filePath2)
             if(fs.existsSync(filePath2)){
                 console.log("ifffff")
-                device_info.first_sync_received == true
+               
                 
                 // device_info.resetReceivedPackageCnt();
                 // device_info.setLastCRC(0);
@@ -917,12 +958,22 @@ exports.run_fsm = function (current_state, connection, cmd_id, data_buffer, devi
                     const fileContent = fs.readFileSync(filePath2, 'utf8');
                     const jsonData = JSON.parse(fileContent);
             
+                    if(jsonData.uploadedToS3 == true){
+                        console.log("catch");
+                        let query = Buffer.from([0, 5, 0, 4, 0, 0, 0, 0]);
+                        connection.write(query);
+                        current_state = FSM_STATE.LOOK_FOR_FILES;
+                    }
+                    else{
+                        
                     // Extract required values
                    
                     const totalPackages = jsonData.totalPackages;
 
                     let offset = jsonData.receivedPackages;
+                    
                     console.log("offset", offset)
+                    device_info.first_sync_received == true
                     device_info.setReceivedPackageCnt(0); //may be 0
                     device_info.setTotalPackages((totalPackages - offset) )
                     device_info.clearBuffer();
@@ -948,6 +999,8 @@ exports.run_fsm = function (current_state, connection, cmd_id, data_buffer, devi
                    progress_bar.update(recive_pkg);
                    emitdatatoSocket(device_info.getDeviceInfoData());
              current_state = FSM_STATE.WAIT_FOR_CMD;
+                    }
+                  
 
             
                 } catch (error) {
@@ -958,16 +1011,22 @@ exports.run_fsm = function (current_state, connection, cmd_id, data_buffer, devi
             else{
                 dbg.logAndPrint("Total packages incoming for this file: " + device_info.getTotalPackages());
                 initializeData(device_info.getDeviceDirectory().split("/").pop() , metadata.getTimestamp(),  device_info.getTotalPackages(),  metadata.getFramerate(), metadata.getFileType(), metadata.getLength()   ,device_info.getclientId(),  device_info.getvehicle(),filePath2)
-
+                const filePathMedia = path.join(__dirname, device_info.getDeviceDirectory(), metadata.getTimestamp() + device_info.getExtension());
+                fs.writeFile(filePathMedia, '', (err) => {
+                    if (err) {
+                      console.error('Error creating the file:', err);
+                    } else {
+                      console.log('File created successfully');
+                    }
+                  });
                 const query = Buffer.from([0, 2, 0, 4, 0, 0, 0, 0]);
                 connection.write(query);
              //   dbg.log('[TX]: [' + query.toString('hex') + ']');
              
                 current_state = FSM_STATE.WAIT_FOR_CMD;
-                
                 let total_pkg = device_info.getTotalPackages();
-                emitdatatoSocket(device_info.getDeviceInfoData());
                 progress_bar.start(total_pkg, 0);
+                emitdatatoSocket(device_info.getDeviceInfoData());
             }
             /* if (device_info.getTotalPackages() == 0) {
                 dbg.logAndPrint("No packages are left for this file");
@@ -1016,12 +1075,12 @@ exports.run_fsm = function (current_state, connection, cmd_id, data_buffer, devi
             /* Calculate CRC + add sum of last packet */
            // let computed_crc = crc16_generic(device_info.getLastCRC(), 0x8408, raw_file);
             /* Read actual CRC in packet */
-            let actual_crc = data_buffer.readUInt16BE(4 + data_len);
+          //  let actual_crc = data_buffer.readUInt16BE(4 + data_len);
             /* Calculate CRC and display with actual */
 
            // console.log("CRC = Computed: " + computed_crc + ", Actual : " + actual_crc);
 
-            if (actual_crc === '12324sacdecfdscdsv') {
+            if ("fdg" === '12324sacdecfdscdsv') {
                  console.log("CRC mismatch!");
                 // current_state = FSM_STATE.REPEAT_PACKET;
             } else {
@@ -1047,14 +1106,30 @@ exports.run_fsm = function (current_state, connection, cmd_id, data_buffer, devi
 try {
     const filePathMedia = path.join(__dirname, device_info.getDeviceDirectory(), metadata.getTimestamp() + device_info.getExtension());
     const filePathjson = path.join(__dirname, device_info.getDeviceDirectory(), metadata.getTimestamp() + '.json');
+    const filePathbin = path.join(__dirname, device_info.getDeviceDirectory(), metadata.getTimestamp() + '.bin');
+   
     let buffer = Buffer.from(raw_file, "base64");
-    fs.appendFileSync(filePathMedia, buffer)
+//     storeAndRetrieveBuffer(raw_file, filePathMedia)
+//   .then(() => {
+//     console.log('Parsed buffer:');
+//     incrementReceivedPackages(filePathjson);
+//     // fs.appendFileSync(filePathbin, buffer)
+//      let rx_pkg_cnt = device_info.getReceivedPackageCnt();
+//      progress_bar.update(rx_pkg_cnt);
+//   })
+//   .catch(error => {
+//     console.error('Error:', error);
+//   });
+fs.appendFileSync(filePathbin, buffer)
+   
+   fs.appendFileSync(filePathMedia, buffer)
     incrementReceivedPackages(filePathjson);
+   // fs.appendFileSync(filePathbin, buffer)
     let rx_pkg_cnt = device_info.getReceivedPackageCnt();
     progress_bar.update(rx_pkg_cnt);
     emitdatatoSocket(device_info.getDeviceInfoData());
-    // Save for calculating next packet's CRC
-    device_info.setLastCRC(actual_crc);
+   // Save for calculating next packet's CRC
+  //  device_info.setLastCRC(actual_crc);
 } catch (error) {
     
 }
@@ -1354,7 +1429,8 @@ try {
 
         if (file_available == false) {
             device_info.setFileToDL(0);
-            dbg.logAndPrint("No files available!");
+
+            console.log("No files available!");
             current_state = FSM_STATE.SEND_END;
         } else {
             // dbg.logAndPrint("Protocol version: " + protocol_version);
@@ -1367,16 +1443,51 @@ try {
 
     if (current_state == FSM_STATE.FINISH_RECEIVING) {
         progress_bar.stop();
-        
         device_info.resetReceivedPackageCnt();
         device_info.clearBuffer();
+console.log("1111111111111")
+        // const filePathMedia = path.join(__dirname, device_info.getDeviceDirectory(), metadata.getTimestamp() + device_info.getExtension());
+        // getBufferFromRedis(filePathMedia)
+        // .then(parsedBuffer => {
+        //   console.log('Parsed buffer retrieved:', parsedBuffer);
+        //   fs.appendFileSync(filePathMedia, parsedBuffer)
+        // })
+        // .catch(error => {
+        //   console.error('Error retrieving buffer:', error);
+        // });
+   
 
         if (device_info.getExtension() == ".h265") {
             processVideoFile(device_info.getDeviceDirectory(), metadata.getTimestamp(),metadata.getFramerate(),device_info.getExtension(),device_info.getFileToDL() ,device_info)
             }
             else {
                 processImageFile(metadata.getTimestamp(),device_info)
+
+              //  const binFilePath = path.join(__dirname, device_info.getDeviceDirectory(), metadata.getTimestamp() + '.bin');
+   
+
+// // Path to output .jpeg file
+// const jpegFilePath = path.join(__dirname, device_info.getDeviceDirectory(), metadata.getTimestamp() + 'pic.jpeg');;
+
+// // Read the .bin file into a buffer
+// fs.readFile(binFilePath, (err, data) => {
+//   if (err) {
+//     console.error('Error reading the .bin file:', err);
+//     return;
+//   }
+
+//   // Write the buffer to a .jpeg file
+//   fs.writeFile(jpegFilePath, data, (err) => {
+//     if (err) {
+//       console.error('Error writing the .jpeg file:', err);
+//       return;
+//     }
+
+//     console.log('File successfully converted to .jpeg!');
+//   });d
+// });
             }
+
             emitdatatoSocket(device_info.getDeviceInfoData());
         current_state = FSM_STATE.LOOK_FOR_FILES;
     }
@@ -1467,7 +1578,7 @@ try {
     }
 
     if (current_state == FSM_STATE.SEND_COMPLETE) {
-        dbg.logAndPrint("Completing upload");
+        console.log("Completing upload");
         // Close session
         const query = Buffer.from([0, 5, 0, 4, 0, 0, 0, 0]);
         dbg.log('[TX]: [' + query.toString('hex') + ']');
