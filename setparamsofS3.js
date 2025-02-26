@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
-const { uploadToS3 } = require("./uploadToS3.js");
-const { ConvertVideoFile } = require("./ConvertVideoFile.js");
+const { uploadToS3 } = require("./utils/uploadToS3.js");
+const { ConvertVideoFile } = require("./utils/ConvertVideoFile.js");
 
 
 

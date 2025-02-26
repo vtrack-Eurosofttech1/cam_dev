@@ -4,7 +4,7 @@ const { exec } = require("child_process");
 const dbg = require('./debug.js');
 const DeviceModel = require("./model/device.model");
 const emitdatatoSocket = require("./utils/socket.js");
-const { processVideoFile, processImageFile } = require("./utils/setparamsofS3.js");
+const { processVideoFile, processImageFile } = require("./setparamsofS3.js");
 const path = require('path');
 /* const redisConnectionHelper = require('./redisConnectionHelper.js');
 var redisClient
@@ -915,8 +915,9 @@ function incrementReceivedPackages(filePath) {
         data.receivedPackages += 1;
        //  console.log("filepath2",filePath)    
         fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
-     //   console.log('receivedPackages incremented by 1.');
-     dbg.logAndPrint('receivedPackages incremented by 1.' + data.receivedPackages )
+    //  //   console.log('receivedPackages incremented by 1.');
+    //  dbg.logAndPrint('receivedPackages incremented by 1.' + data.receivedPackages )
+    console.log(`receivedPackages: ${data.receivedPackages}/${data.totalPackages}`)
     } catch (error) {
         console.log("err in increament", error);
     }

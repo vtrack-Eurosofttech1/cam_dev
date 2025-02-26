@@ -1,4 +1,4 @@
-const mongoose = require("..//mongoose.service").mongoose;
+const mongoose = require("../mongoose.service").mongoose;
 
 const Schema = mongoose.Schema;
 

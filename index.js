@@ -2,14 +2,13 @@ const net = require('net');
 const commandLineArgs = require('command-line-args');
 const tls = require('tls');
 const fs = require('fs');
-const protocol = require('./protocolori.js');
+const protocol = require('./protocol.js');
 const cliProgress = require('cli-progress');
 const _colors = require('colors');
 const dbg = require('./debug.js')
 const { v4: uuidv4 } = require("uuid");
 const path = require('path')
-const { processVideoFile, processImageFile } = require("./utils/setparamsofS3.js");
-
+const { processVideoFile, processImageFile } = require("./setparamsofS3.js");
 process.setMaxListeners(0);
 dbg.logAndPrint("Camera Transfer Server (Copyright © 2022, \x1b[34mTeltonika\x1b[0m), version 0.2.13");
 const optionDefinitions = [
