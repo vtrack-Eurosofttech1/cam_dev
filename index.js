@@ -135,7 +135,7 @@ function handleConnection(connection) {
     dbg.logAndPrint('Client connected: ' + remoteAddress);
 
     let lastActivityTime = Date.now(); 
-  dbg.logAndPrint("Client connected: " + remoteAddress);
+ // dbg.logAndPrint("Client connected: " + remoteAddress);
   const INACTIVITY_TIMEOUT = 30000; 
 
   // Timer to check inactivity
@@ -249,6 +249,7 @@ function handleConnection(connection) {
 
             // Check CMD validity
             cmd_id = protocol.ParseCmd(tcp_buffer);
+            dbg.log("cmd_id : " + cmd_id);
             if (protocol.IsCmdValid(cmd_id) == false) {
                 dbg.log("Invalid CMD ID: " + cmd_id);
                 tcp_buffer = Buffer.alloc(0);

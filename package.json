@@ -17,6 +17,8 @@
     "colors": "^1.4.0",
     "command-line-args": "^5.2.1",
     "crc-full": "^1.1.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
     "ffmpeg": "^0.0.4",
     "ffmpeg-static": "^5.2.0",
     "fluent-ffmpeg": "^2.1.3",

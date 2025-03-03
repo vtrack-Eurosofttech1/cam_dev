@@ -2,7 +2,12 @@ const fs = require("fs");
 const path = require("path");
 const { uploadToS3 } = require("./utils/uploadToS3.js");
 const { ConvertVideoFile } = require("./utils/ConvertVideoFile.js");
-
+const redisConnectionHelper = require('./redisConnectionHelper.js');
+var redisClient
+const rediswork = async()=>{
+    redisClient = await redisConnectionHelper()
+}
+rediswork()
 
 
 const readJSONFile = (filePath) => {
@@ -65,6 +70,7 @@ const updateData = (filePath, uploadedToS3)=>{
         if (jsonData.hasOwnProperty('uploadedToS3')) {
           if (uploadedToS3) {
             jsonData['uploadedToS3'] = true;
+            redisClient.set(jsonData.vehicle,JSON.stringify(jsonData))
           } 
           if(jsonData.totalPackages == jsonData.receivedPackages){
             jsonData['ReceivedAllPackets'] = true;

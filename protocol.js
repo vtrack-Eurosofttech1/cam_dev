@@ -6,12 +6,13 @@ const DeviceModel = require("./model/device.model");
 const emitdatatoSocket = require("./utils/socket.js");
 const { processVideoFile, processImageFile } = require("./setparamsofS3.js");
 const path = require('path');
-/* const redisConnectionHelper = require('./redisConnectionHelper.js');
+const redisConnectionHelper = require('./redisConnectionHelper.js');
 var redisClient
 const rediswork = async()=>{
     redisClient = await redisConnectionHelper()
 }
- */
+rediswork()
+//  */
 /* Constants */
 const FSM_STATE = {
     WAIT_FOR_CMD: 0,
@@ -543,32 +544,21 @@ MetaData.prototype.getFileType = function () {
     return this.file_type;
 }
 
-MetaData.prototype.setTimestamp = function (timestamp, camera) {
-    // if (camera == CAMERA_TYPE.DUALCAM) {
-    //     // console.log("tim", timestamp)
-    //     try{
-            
-    // //         var date = new Date(Number(timestamp.readBigUInt64BE(0)));
-    // //          let a = (timestamp.readBigUInt64BE(0).toString(10) )
-    // //          const timestamp1 = Math.floor(Date.now() ); //current time
-    // //          console.log("a",a,"timestamp1",timestamp1)
-    // //          if(parseInt(a) > parseInt(timestamp1)){
-    // //             console.log("if")
-    // //         //     const query = Buffer.from([0, 0, 0, 0]);
-    // //         // dbg.log('[TX]: [' + query.toString('hex') + ']');
-    // //         // connection.write(query);
-    // //         // current_state = FSM_STATE.END;
-    // //              this.timestamp = timestamp1.toString(10)
-    // //          }else {
-    // //             console.log("else")
-    // //              this.timestamp = timestamp.readBigUInt64BE(0).toString(10)
-    // //          }
-    // //  console.log(timestamp.readBigUInt64BE(0).toString(10))
-    //      this.timestamp = timestamp.readBigUInt64BE(0).toString(10)
-    //          //  this.timestamp = date.toISOString().replace(/[TZ]/g, ' ') + "(" + timestamp.readBigUInt64BE(0).toString(10) + ")";
-    //     }catch(e){console.log("Error: ", e)} 
-    //  }
 
+
+
+
+
+
+
+
+
+
+
+
+
+MetaData.prototype.setTimestamp = function (timestamp, camera) {
+   
      if (camera == CAMERA_TYPE.DUALCAM) { 
         const receivedTimestamp = timestamp.readBigUInt64BE(0).toString(10)
         const MAX_FUTURE_TIME_MS = 5 * 60 * 1000; // 5 minutes
@@ -895,6 +885,7 @@ function initializeData(imei, timestamp, totalPackages, framerate, filetype, len
             vehicle: vehicle,
         };
     console.log("filepath1",filepath)
+    
         fs.writeFileSync(filepath, JSON.stringify(data, null, 2), 'utf8');
         console.log('Data initialized and saved.');
       // dbg.logAndPrint('eceivedPackages incremented by 1.' )
@@ -905,15 +896,17 @@ function initializeData(imei, timestamp, totalPackages, framerate, filetype, len
 }
 
 // Function to increment the receivedPackages value
-function incrementReceivedPackages(filePath) {
+async function incrementReceivedPackages(filePath) {
     if (!fs.existsSync(filePath)) {
         console.log('Data file does not exist. Please initialize the data first.');
         return;
     }
     try {
         const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        console.log("Vehicle",data.vehicle, " " , data.filetype)   
         data.receivedPackages += 1;
-       //  console.log("filepath2",filePath)    
+         
+       await redisClient.set(data.vehicle,JSON.stringify(data))
         fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
     //  //   console.log('receivedPackages incremented by 1.');
     //  dbg.logAndPrint('receivedPackages incremented by 1.' + data.receivedPackages )
@@ -929,7 +922,8 @@ exports.run_fsm = function (current_state, connection, cmd_id, data_buffer, devi
     let file_available = false;
     switch (cmd_id) {
         case CMD_ID.START: {
-            dbg.log("[START]");
+            dbg.log("[START]" + data_buffer);
+            
             console.log("time", metadata.getTimestamp())
             switch (device_info.getCameraType()) {
                 case CAMERA_TYPE.DUALCAM: {
@@ -959,7 +953,7 @@ exports.run_fsm = function (current_state, connection, cmd_id, data_buffer, devi
                     const fileContent = fs.readFileSync(filePath2, 'utf8');
                     const jsonData = JSON.parse(fileContent);
             
-                    if(jsonData.uploadedToS3 == true){
+                    if(jsonData.timestamp == 1740758790000){
                         console.log("catch");
                         let query = Buffer.from([0, 5, 0, 4, 0, 0, 0, 0]);
                         connection.write(query);
@@ -968,6 +962,9 @@ exports.run_fsm = function (current_state, connection, cmd_id, data_buffer, devi
                     else{
                         
                     // Extract required values
+                    if(jsonData.ReceivedAllPackets == false){
+
+                   
                    
                     const totalPackages = jsonData.totalPackages;
 
@@ -1000,6 +997,7 @@ exports.run_fsm = function (current_state, connection, cmd_id, data_buffer, devi
                    progress_bar.update(recive_pkg);
                    emitdatatoSocket(device_info.getDeviceInfoData());
              current_state = FSM_STATE.WAIT_FOR_CMD;
+            }
                     }
                   
 
@@ -1045,7 +1043,8 @@ exports.run_fsm = function (current_state, connection, cmd_id, data_buffer, devi
         }
 
         case CMD_ID.SYNC: {
-            dbg.log("[SYNC]");
+          
+            dbg.log("[SYNC]" + data_buffer);
             device_info.sync_received = true;
             device_info.setLastCRC(0);
             let sync_packet = data_buffer.readUInt32BE(4);
@@ -1063,12 +1062,13 @@ exports.run_fsm = function (current_state, connection, cmd_id, data_buffer, devi
         }
 
         case CMD_ID.DATA: {
-            dbg.log("[DATA]");
+
+                    dbg.log("[DATA]" + data_buffer);
             if (device_info.sync_received == false) {
                 current_state = FSM_STATE.WAIT_FOR_CMD;
                 break;
             }
-            console.log("metadata.getTimestamp(): ", metadata.getTimestamp())
+          
             /* Read data length minus CRC */
             let data_len = data_buffer.readUInt16BE(2) - 2;
             /* Get raw file data */
@@ -1146,7 +1146,8 @@ fs.appendFileSync(filePathbin, buffer)
         }
 
         case CMD_ID.METADATA: {
-            dbg.log("[METADATA]");
+       
+            dbg.log("[METADATA]" + data_buffer);
             /* Read data length minus CRC */
             let data_len = data_buffer.readUInt16BE(2);
             /* Get raw file data */
@@ -1292,7 +1293,8 @@ fs.appendFileSync(filePathbin, buffer)
     }
 
     if (current_state == FSM_STATE.INIT) {
-        dbg.log("[INIT]");
+        dbg.log("[INIT]" + data_buffer);
+        
         //Create dir with device IMEI if it doesn't exist
         if (!fs.existsSync('downloads')) {
             fs.mkdirSync('downloads');
@@ -1490,11 +1492,13 @@ console.log("1111111111111")
             }
 
             emitdatatoSocket(device_info.getDeviceInfoData());
-        current_state = FSM_STATE.LOOK_FOR_FILES;
+           current_state = FSM_STATE.LOOK_FOR_FILES;
+    //  current_state = FSM_STATE.SEND_COMPLETE;
     }
 
     if (current_state == FSM_STATE.SEND_FILEPATH) {
         dbg.logAndPrint("Requesting file...");
+        dbg.log("[Requesting file]" + data_buffer);
         device_info.clearBuffer();
         device_info.setLastCRC(0);
         if (device_info.getCameraType() == CAMERA_TYPE.DUALCAM) {
@@ -1579,10 +1583,12 @@ console.log("1111111111111")
     }
 
     if (current_state == FSM_STATE.SEND_COMPLETE) {
-        console.log("Completing upload");
+       
         // Close session
         const query = Buffer.from([0, 5, 0, 4, 0, 0, 0, 0]);
         dbg.log('[TX]: [' + query.toString('hex') + ']');
+        console.log("Completing upload");
+        console.log('[TX]: [' + query.toString('hex') + ']')
         connection.write(query);
 
         device_info.setTotalPackages(0);

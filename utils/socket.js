@@ -9,12 +9,28 @@ var httpsOptions = {
     key: fs.readFileSync(keyPath, 'utf8'),
     cert: fs.readFileSync(certPath, 'utf8')
   };
-
+const express = require('express');
+const app = express();
+const redisConnectionHelper = require("../redisConnectionHelper");
 
 const WEB_SERVER_PORT = 7057;
-const httpsServer = https.createServer(httpsOptions);
+const httpsServer = https.createServer(httpsOptions,(req,res)=>{
+    app.handle(req,res)
+});
 const io = new Server({ cors: { origin: "*" } });
+var redisClient
+const rediswork = async()=>{
+    redisClient = await redisConnectionHelper()
+}
+rediswork()
+app.get('/camera/:imei', async (req,res)=>{
+    try{
+        return res.send({data:JSON.parse(await redisClient.get(req.params.imei)), message:"camera data get", success:true})
+    }catch(err){
+        return res.send({ message:err.message, success:false})
 
+    }
+})
 httpsServer.listen(WEB_SERVER_PORT, () => {
     console.log("Socket Server is running on port " + WEB_SERVER_PORT);
 });
@@ -27,7 +43,7 @@ io.on("connection", (socket) => {
     // }
     // console.log("A client connected:", socket.id, "IP:", clientIp, socket.handshake.query);
 
-    console.log("A client connected:", socket.id,socket.handshake.headers.origin);
+   // console.log("A client connected:", socket.id,socket.handshake.headers.origin);
     setTimeout(()=>{
 
     },10000)
@@ -37,7 +53,7 @@ io.on("connection", (socket) => {
    
     
     socket.on("disconnect", (e)=>{
-            console.log("disconn", socket.handshake.headers.origin)
+           // console.log("disconn", socket.handshake.headers.origin)
          })
 });
 // io.on("disconnect", (e)=>{
