@@ -19,8 +19,9 @@ const connectWithRetry = async() => {
 
   const uri =
   process.env.ENVIRONMENT === "DEVELOPMENT" ? 
-  "mongodb+srv://DevWrapper:nuLxZCq6XRiKL8p3@vtracksolutions.nih4b.mongodb.net/Dev_VtrackV1?retryWrites=true&w=majority"
-  :"mongodb+srv://Wrapper:D2zQcgJvtnKS4Jkr@vtracksolutions.nih4b.mongodb.net/VtrackV1?retryWrites=true&w=majority";  
+  process.env.PROD_MONGO 
+  :process.env.DEV_MONGO
+  
   try {
     await mongoose.connect(uri);
     isConnected = true;
