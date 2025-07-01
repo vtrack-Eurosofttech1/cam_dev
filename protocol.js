@@ -148,6 +148,8 @@ function Device() {
     this.protocol_version = 0;
     this.clientId = "";
     this.vehicle = "";
+    this.FileTimeStamp = "";
+    this.timezone = "";
 }
 
 exports.DeviceDescriptor = Device;
@@ -175,6 +177,16 @@ Device.prototype.getCurrentFilename = function () {
     return this.filename;
 }
 
+Device.prototype.setFileTimeStamp = function (FileTimeStamp) {
+    this.FileTimeStamp = FileTimeStamp;
+}
+
+
+Device.prototype.getFileTimeStamp = function () {
+    return this.FileTimeStamp;
+}
+
+
 Device.prototype.setclientId = function (id) {
     this.clientId = id;
   };
@@ -187,6 +199,12 @@ Device.prototype.setclientId = function (id) {
   Device.prototype.getvehicle = function () {
     return this.vehicle;
   };
+  Device.prototype.setTimeZone = function (timezone) {
+    this.timezone = timezone;
+  };
+  Device.prototype.getTimeZone = function () {
+    return this.timezone;
+  }; 
 
 Device.prototype.setLastCRC = function (crc) {
     this.actual_crc = crc;
@@ -280,7 +298,8 @@ Device.prototype.getDeviceInfoData = function () {
       filetype: this.extension_to_use,
       // fsm_state: this.fsm_state,,
       camera_type: this.query_file,
-      timestamp:this.newtimestamp ,
+       timestamp: parseInt(this.FileTimeStamp), //his.newtimestamp ,
+
       deviceDirectory: this.deviceDirectory,
       filename: this.filename,
       path:`https://vtracksolutions.s3.eu-west-2.amazonaws.com/media/${this.deviceDirectory.split("/")[1]}/${this.newtimestamp}${extension}`,    
@@ -443,7 +462,7 @@ MetaData.prototype.parseData = function (metadata, device_info, raw_data) {
     if (device_info.getCameraType() == CAMERA_TYPE.DUALCAM) {
         metadata.setCommandVersion(raw_data.slice(0, 1));                               //1 byte
         metadata.setFileType(raw_data.slice(1, 2), device_info.getCameraType());        //1 byte
-        metadata.setTimestamp(raw_data.slice(2, 10), device_info.getCameraType());      //8 bytes (uint, seconds)
+        metadata.setTimestamp(raw_data.slice(2, 10), device_info.getCameraType(), device_info);      //8 bytes (uint, seconds)
         metadata.setTriggerSource(raw_data.slice(10, 11), device_info.getCameraType()); //1 byte
         metadata.setLength(raw_data.slice(11, 13), device_info.getCameraType());        //2 bytes
         metadata.setFramerate(raw_data.slice(13, 14));                                  //1 byte
@@ -557,7 +576,7 @@ MetaData.prototype.getFileType = function () {
 
 
 
-MetaData.prototype.setTimestamp = function (timestamp, camera) {
+MetaData.prototype.setTimestamp = function (timestamp, camera, device_info) {
    
      if (camera == CAMERA_TYPE.DUALCAM) { 
         const receivedTimestamp = timestamp.readBigUInt64BE(0).toString(10)
@@ -571,6 +590,7 @@ MetaData.prototype.setTimestamp = function (timestamp, camera) {
             (receivedTimestamp - currentTimestamp) <= MAX_FUTURE_TIME_MS) {
            console.log("if",timestamp.readBigUInt64BE(0).toString(10) )
            this.timestamp = timestamp.readBigUInt64BE(0).toString(10)
+           device_info.setFileTimeStamp(timestamp.readBigUInt64BE(0).toString(10))
         } else {
             console.log(`Invalid future timestamp received (${receivedTimestamp}). Using current timestamp.`);
             console.log("else",currentTimestamp )
@@ -810,6 +830,38 @@ function SaveToFileJSON(jsonString, path) {
     });
 };
 
+const updateFieldS3 = (filePath, Timestamp)=>{
+    fs.readFile(filePath, 'utf8', (err, data) => {
+        if (err) {
+          console.error('Error reading the file:', err);
+          return;
+        }
+    
+        let jsonData;
+        try {
+          jsonData = JSON.parse(data);
+        } catch (parseErr) {
+          console.error('Error parsing JSON:', parseErr);
+          return;
+        }
+        //jb half file download hokr phr se dwonload hona strt ho
+    if((jsonData.totalPackages < jsonData.receivedPackages )&& (jsonData.timestamp == Timestamp) ){
+        jsonData['uploadedToS3'] = false;
+        fs.writeFile(filePath, JSON.stringify(jsonData, null, 2), 'utf8', (writeErr) => {
+            if (writeErr) {
+              console.error('Error writing to file:', writeErr);
+            } else {
+              console.log('Successfully updated the "receivedPackages" value');
+            }
+          });
+    }
+        
+         
+        
+          
+        } )
+}
+
 
 function ConvertVideoFile(directory, filename, extension, metadata, metadata_option) {
     framerate = "25";
@@ -865,6 +917,7 @@ const storeAndRetrieveBuffer = async (raw_file, filePathMedia) => {
     }
   };
   
+  
 
 
 function initializeData(imei, timestamp, totalPackages, framerate, filetype, length,clientId, vehicle, filepath) {
@@ -918,6 +971,8 @@ async function incrementReceivedPackages(filePath) {
    
 }
 
+
+
 exports.run_fsm = function (current_state, connection, cmd_id, data_buffer, device_info, metadata, progress_bar, camera_option, metadata_option) {
     let file_available = false;
     switch (cmd_id) {
@@ -942,7 +997,7 @@ exports.run_fsm = function (current_state, connection, cmd_id, data_buffer, devi
             const filePath2 = path.join(__dirname, device_info.getDeviceDirectory(), metadata.getTimestamp() + '.json');
            // console.log(fs.existsSync(filePath2))
            // console.log("filePath2: ",filePath2)
-            if(fs.existsSync(filePath2)){
+            if(fs.existsSync(filePath2) ){
                 console.log("ifffff")
                
                 
@@ -953,7 +1008,7 @@ exports.run_fsm = function (current_state, connection, cmd_id, data_buffer, devi
                     const fileContent = fs.readFileSync(filePath2, 'utf8');
                     const jsonData = JSON.parse(fileContent);
             
-                    if(jsonData.timestamp == 1740758790000){
+                    if(jsonData.timestamp == metadata.getTimestamp() && (jsonData.ReceivedAllPackets == true)){
                         console.log("catch");
                         let query = Buffer.from([0, 5, 0, 4, 0, 0, 0, 0]);
                         connection.write(query);
@@ -988,6 +1043,7 @@ exports.run_fsm = function (current_state, connection, cmd_id, data_buffer, devi
                    offset = offsetNum.toString()
                //console.log("s",offset)
                    query.writeUInt32BE(offset, 4);
+                   console.log("[serveriniy]: [" + query.toString('hex') + "]")
                    dbg.log("[serveriniy]: [" + query.toString('hex') + "]");
                    ////console.log("Sascas", query.writeUInt32BE(offset, 4))
                    connection.write(query);
@@ -998,6 +1054,7 @@ exports.run_fsm = function (current_state, connection, cmd_id, data_buffer, devi
                    emitdatatoSocket(device_info.getDeviceInfoData());
              current_state = FSM_STATE.WAIT_FOR_CMD;
             }
+            // return    agr video dubara download nai ho rhi to isko uncomment kro
                     }
                   
 
@@ -1045,6 +1102,8 @@ exports.run_fsm = function (current_state, connection, cmd_id, data_buffer, devi
         case CMD_ID.SYNC: {
           
             dbg.log("[SYNC]" + data_buffer);
+            const filePathjson = path.join(__dirname, device_info.getDeviceDirectory(), metadata.getTimestamp() + '.json');
+            updateFieldS3(filePathjson, metadata.getTimestamp())
             device_info.sync_received = true;
             device_info.setLastCRC(0);
             let sync_packet = data_buffer.readUInt32BE(4);
@@ -1107,7 +1166,7 @@ exports.run_fsm = function (current_state, connection, cmd_id, data_buffer, devi
 try {
     const filePathMedia = path.join(__dirname, device_info.getDeviceDirectory(), metadata.getTimestamp() + device_info.getExtension());
     const filePathjson = path.join(__dirname, device_info.getDeviceDirectory(), metadata.getTimestamp() + '.json');
-    const filePathbin = path.join(__dirname, device_info.getDeviceDirectory(), metadata.getTimestamp() + '.bin');
+   // const filePathbin = path.join(__dirname, device_info.getDeviceDirectory(), metadata.getTimestamp() + '.bin');
    
     let buffer = Buffer.from(raw_file, "base64");
 //     storeAndRetrieveBuffer(raw_file, filePathMedia)
@@ -1121,7 +1180,7 @@ try {
 //   .catch(error => {
 //     console.error('Error:', error);
 //   });
-fs.appendFileSync(filePathbin, buffer)
+// fs.appendFileSync(filePathbin, buffer)
    
    fs.appendFileSync(filePathMedia, buffer)
     incrementReceivedPackages(filePathjson);
@@ -1337,24 +1396,47 @@ fs.appendFileSync(filePathbin, buffer)
                as: "vehicles"
              }
            },
+           
            {
              $unwind: "$vehicles"
            },
+           {
+            $lookup: {
+              from: "clients",
+              let: { client: "$deviceassigns.clientId" },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: { $eq: [{$toString:"$_id"}, { $toString: "$$client" }] }
+                  }
+                }
+              ],
+              as: "clients"
+            }
+          },
+          
+          {
+            $unwind: "$clients"
+          },
          {
            $project: {
              deviceassigns: 1,
-             vehicles: 1
+             vehicles: 1,clients:1
            }
          }
        ])
        .then(async (c) => {
-         
+        
          if(c.length>0){
-             clientId = c[0].deviceassigns.clientId
-             vehicle = c[0].vehicles.vehicleReg
+             clientId = c[0].deviceassigns?.clientId
+             vehicle = c[0].vehicles?.vehicleReg
+             timezone = c[0].clients?.timeZone
 
+            
           device_info.setclientId(c[0].deviceassigns.clientId)
           device_info.setvehicle(c[0].vehicles.vehicleReg)
+          device_info.setTimeZone(c[0].clients.timeZone)
+         
      }
        }); 
 
@@ -1461,7 +1543,8 @@ console.log("1111111111111")
    
 
         if (device_info.getExtension() == ".h265") {
-            processVideoFile(device_info.getDeviceDirectory(), metadata.getTimestamp(),metadata.getFramerate(),device_info.getExtension(),device_info.getFileToDL() ,device_info)
+            console.log("nnn", device_info.getTimeZone())
+            processVideoFile(device_info.getDeviceDirectory(), metadata.getTimestamp(),metadata.getFramerate(),device_info.getExtension(),device_info.getFileToDL() ,device_info, device_info.getTimeZone())
             }
             else {
                 processImageFile(metadata.getTimestamp(),device_info)

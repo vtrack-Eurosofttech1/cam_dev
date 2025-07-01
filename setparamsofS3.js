@@ -67,15 +67,14 @@ const updateData = (filePath, uploadedToS3)=>{
           return;
         }
     
-        if (jsonData.hasOwnProperty('uploadedToS3')) {
-          if (uploadedToS3) {
-            jsonData['uploadedToS3'] = true;
-            redisClient.set(jsonData.vehicle,JSON.stringify(jsonData))
-          } 
+        if (jsonData.hasOwnProperty('uploadedToS3')) {          
           if(jsonData.totalPackages == jsonData.receivedPackages){
-            jsonData['ReceivedAllPackets'] = true;
-            jsonData['uploadedToS3'] = true;
+            jsonData['ReceivedAllPackets'] = true;           
           }
+          jsonData['uploadedToS3'] = true;
+          redisClient.set(jsonData.vehicle,JSON.stringify(jsonData))
+          // if (uploadedToS3 && (jsonData.totalPackages !== jsonData.receivedPackages)) {
+          // } 
     
           fs.writeFile(filePath, JSON.stringify(jsonData, null, 2), 'utf8', (writeErr) => {
             if (writeErr) {
@@ -128,7 +127,7 @@ console.log("convert", d);
           fileName: fileName,
           deviceIMEI: IMEI.split("/").pop(),
           filePath: filePath,
-          cameraType: getFileToDL
+          cameraType: getFileToDL,
         });
       //  device_info.setUploadedToS3(true);
         let filePath1 = path.join(__dirname, device_info.getDeviceDirectory(), `${timestamp}` + '.json');

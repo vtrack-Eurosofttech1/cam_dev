@@ -22,12 +22,18 @@ var redisClient
 const rediswork = async()=>{
     redisClient = await redisConnectionHelper()
 }
+const cors = require("cors");
+app.use(cors({ origin: "*" }));
+app.use(express.json());
 rediswork()
 app.get('/camera/:imei', async (req,res)=>{
     try{
-        return res.send({data:JSON.parse(await redisClient.get(req.params.imei)), message:"camera data get", success:true})
+        console.log(req.params?.imei)
+        console.log(await redisClient.get(req.params?.imei))
+        console.log(JSON.parse(await redisClient.get(req.params?.imei)))
+        return res.status(200).send({data:JSON.parse(await redisClient.get(req.params.imei)), message:"camera data get", success:true})
     }catch(err){
-        return res.send({ message:err.message, success:false})
+        return res.status(200).send({ message:err.message, success:false})
 
     }
 })
@@ -43,7 +49,7 @@ io.on("connection", (socket) => {
     // }
     // console.log("A client connected:", socket.id, "IP:", clientIp, socket.handshake.query);
 
-   // console.log("A client connected:", socket.id,socket.handshake.headers.origin);
+   console.log("A client connected:", socket.id,socket.handshake.headers.origin);
     setTimeout(()=>{
 
     },10000)
