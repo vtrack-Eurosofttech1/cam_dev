@@ -17,11 +17,10 @@ const connectWithRetry = async() => {
 
   }
 
-  const uri =
+   const uri =
   process.env.ENVIRONMENT === "DEVELOPMENT" ? 
-  process.env.PROD_MONGO 
-  :process.env.DEV_MONGO
-  
+  process.env.DEV_MONGO
+  :process.env.PROD_MONGO 
   try {
     await mongoose.connect(uri);
     isConnected = true;
@@ -70,6 +69,10 @@ const connectWithRetry = async() => {
 // } else {
 //   connectWithRetry();
 // }
-
+process.on("SIGINT", async () => {
+  await mongoose.disconnect();
+  console.log("🛑 MongoDB disconnected on app termination");
+  process.exit(0);
+});
 connectWithRetry()
 exports.mongoose = mongoose;

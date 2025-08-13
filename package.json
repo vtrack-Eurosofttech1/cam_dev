@@ -6,7 +6,8 @@
   "bin": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "node index.js -p 7056 -r 0 -m 1"
+    "dev": "node index.js -p 7056 -r 0 -m 1",
+    "dev2":"node utils/socket.js"
   },
   "author": "",
   "license": "ISC",
