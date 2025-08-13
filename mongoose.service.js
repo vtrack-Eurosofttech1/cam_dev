@@ -16,11 +16,10 @@ const connectWithRetry = async() => {
     console.log("🟢 Not Already connected to MongoDB.");
 
   }
-
-   const uri =
-  process.env.ENVIRONMENT === "DEVELOPMENT" ? 
+  const uri =
+  process.env.ENVIRONMENT === "DEVELOPMENT" ?
   process.env.DEV_MONGO
-  :process.env.PROD_MONGO 
+  :process.env.PROD_MONGO
   try {
     await mongoose.connect(uri);
     isConnected = true;
