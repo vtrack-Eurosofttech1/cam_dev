@@ -1,9 +1,9 @@
 const AWS = require("aws-sdk");
 const { ObjectId } = require("mongodb");
 const s3 = new AWS.S3({
-  accessKeyId: "AKIAYYM3CIEBEKPUNDEU",
-  secretAccessKey: "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",
-  region: "eu-west-2",
+  accessKeyId: process.env.IAM_USER_KEY,
+  secretAccessKey: process.env.IAM_USER_SECRET,
+  region: process.env.region
 });
 const fs = require('fs');
 var MongoClient = require("mongodb").MongoClient;
@@ -153,113 +153,113 @@ const url =
 };
  */
 
-exports.uploadToS3 =(params,payload)=>{
+exports.uploadToS3 = (params, payload) => {
   return new Promise((resolve, reject) => {
-    let {fileName,fileType,deviceIMEI,cameraType,filePath}=payload
-   console.log("111111111111111",fileName,fileType,deviceIMEI,cameraType);
-    try{
-        s3.upload(params, function (s3Err, fileContent) {
-            if (s3Err) {
-                console.log("Error",s3Err)
-                reject(s3Err);
-                return 
-            }
+    let { fileName, fileType, deviceIMEI, cameraType, filePath } = payload
+    console.log("111111111111111", fileName, fileType, deviceIMEI, cameraType);
+    try {
+      s3.upload(params, function (s3Err, fileContent) {
+        if (s3Err) {
+          console.log("Error", s3Err)
+          reject(s3Err);
+          return
+        }
 
-            uploadedPath = fileContent.Location;
-          //    fs.unlink(filePath, (err) => {
-          //     if (err) {
-          //         console.error("Error deleting file:", err);
-          //     } else {
-          //         console.log("File deleted successfully");
-          //     }
-          // }); 
-            
+        uploadedPath = fileContent.Location;
+        //    fs.unlink(filePath, (err) => {
+        //     if (err) {
+        //         console.error("Error deleting file:", err);
+        //     } else {
+        //         console.log("File deleted successfully");
+        //     }
+        // }); 
 
-            MongoClient.connect(url, function (err, db) {
-              
-              if (err) {return };
-              var dbo = db.db("VtrackV1");
-              dbo
-                .collection("devices")
-                .findOne(
-                  { deviceIMEI},
-                  function (err, fetchedDevice) {
-                   
-                    if (fetchedDevice != null && fetchedDevice != undefined) {
-                      dbo
-                        .collection("deviceassigns")
-                        .findOne(
-                          { DeviceId: fetchedDevice._id.toString() },
-                          function (err, fetchedDeviceassign) {
-                    
 
-                            if (
-                              fetchedDeviceassign != null &&
-                              fetchedDeviceassign != undefined
-                            ) {
-                              dbo.collection("vehicles").findOne(
-                                {
-                                  _id: ObjectId(fetchedDeviceassign.VehicleId),
-                                },
-                                function (err, fetchedVehicle) {
-                    
+        MongoClient.connect(url, function (err, db) {
 
-                                  if (
-                                    fetchedVehicle != null &&
-                                    fetchedVehicle != undefined
-                                  ) {
-                                    var videoListObject = {};
-                                    videoListObject["clientId"] =
-                                      fetchedDeviceassign.clientId;
-                                    videoListObject["dateTime"] = new Date();
+          if (err) { return };
+          var dbo = db.db("VtrackV1");
+          dbo
+            .collection("devices")
+            .findOne(
+              { deviceIMEI },
+              function (err, fetchedDevice) {
 
-                                    videoListObject["fileType"] = fileType;
-                                    videoListObject["fileName"] = fileName;
-                                    videoListObject["Vehicle"] =
-                                      fetchedVehicle.vehicleReg;
-                                    videoListObject["path"] = uploadedPath;
-                                    videoListObject["isSeen"] = false;
-                                    videoListObject["cameraType"] =  cameraType
+                if (fetchedDevice != null && fetchedDevice != undefined) {
+                  dbo
+                    .collection("deviceassigns")
+                    .findOne(
+                      { DeviceId: fetchedDevice._id.toString() },
+                      function (err, fetchedDeviceassign) {
 
-                                    dbo
-                                      .collection("videolists")
-                                      .findOneAndUpdate(
-                                        { path: uploadedPath, clientId:fetchedDeviceassign.clientId, Vehicle:videoListObject.Vehicle },
-                                        {
-                                            $set: {
-                                                dateTime: new Date(),
-                                                fileType: fileType,
-                                                fileName: fileName,
-                                                Vehicle: videoListObject.Vehicle, // Assuming deviceIMEI is the vehicle attribute value
-                                                path: uploadedPath,
-                                                isSeen: false,
-                                                cameraType:cameraType
-                                            }
-                                        },
-                                        { upsert: true },
-                                        function (err, res) {
-                                          if (err) {}
-                                          // fs.unlink(filePath,(err)=>{
-                                          //   console.log(err)
-                                          // })
-                                          console.log("1 document inserted");
-                                          resolve("Upload completed successfully");
-                                          // db.close();
-                                        }
-                                      );
-                                  }
-                                }
-                              );
+
+                        if (
+                          fetchedDeviceassign != null &&
+                          fetchedDeviceassign != undefined
+                        ) {
+                          dbo.collection("vehicles").findOne(
+                            {
+                              _id: ObjectId(fetchedDeviceassign.VehicleId),
+                            },
+                            function (err, fetchedVehicle) {
+
+
+                              if (
+                                fetchedVehicle != null &&
+                                fetchedVehicle != undefined
+                              ) {
+                                var videoListObject = {};
+                                videoListObject["clientId"] =
+                                  fetchedDeviceassign.clientId;
+                                videoListObject["dateTime"] = new Date();
+
+                                videoListObject["fileType"] = fileType;
+                                videoListObject["fileName"] = fileName;
+                                videoListObject["Vehicle"] =
+                                  fetchedVehicle.vehicleReg;
+                                videoListObject["path"] = uploadedPath;
+                                videoListObject["isSeen"] = false;
+                                videoListObject["cameraType"] = cameraType
+
+                                dbo
+                                  .collection("videolists")
+                                  .findOneAndUpdate(
+                                    { path: uploadedPath, clientId: fetchedDeviceassign.clientId, Vehicle: videoListObject.Vehicle },
+                                    {
+                                      $set: {
+                                        dateTime: new Date(),
+                                        fileType: fileType,
+                                        fileName: fileName,
+                                        Vehicle: videoListObject.Vehicle, // Assuming deviceIMEI is the vehicle attribute value
+                                        path: uploadedPath,
+                                        isSeen: false,
+                                        cameraType: cameraType
+                                      }
+                                    },
+                                    { upsert: true },
+                                    function (err, res) {
+                                      if (err) { }
+                                      // fs.unlink(filePath,(err)=>{
+                                      //   console.log(err)
+                                      // })
+                                      console.log("1 document inserted");
+                                      resolve("Upload completed successfully");
+                                      // db.close();
+                                    }
+                                  );
+                              }
                             }
-                          }
-                        );
-                    }
-                  }
-                );
-            });
-          });
-    }catch(e){
-      
+                          );
+                        }
+                      }
+                    );
+                }
+              }
+            );
+        });
+      });
+    } catch (e) {
+
     }
-   } )
+  })
 }
